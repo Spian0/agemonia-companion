@@ -7,7 +7,7 @@ export const metadata = {
   description: '아게모니아 보드게임 헬퍼 앱',
 };
 
-export default function RootLayout({ children }) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
       {/* 모바일 화면처럼 보이기 위해 가운데 정렬 및 최대 너비(max-w-md) 설정 */}
