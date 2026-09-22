@@ -2,26 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
+  /* 1. 스마트폰/PC의 다크모드가 우리 앱의 색상을 멋대로 반전시키는 것을 원천 차단 */
   :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
+    color-scheme: light;
   }
-}
+  
+  /* 2. 앱 내의 모든 입력창(input, textarea, select) 색상 강제 고정 */
+  input, textarea, select {
+    @apply text-[#3e2723] bg-[#e0d0b6] !important;
+    border-color: #a68d6c;
+  }
+  
+  /* 🚨 수정됨: 무한 루프 에러를 피하기 위해 순수 CSS 사용 */
+  input.bg-white, textarea.bg-white {
+    background-color: #ffffff !important;
+  }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  /* 3. '비밀번호를 입력하세요' 같은 힌트 텍스트(Placeholder) 색상도 잘 보이게 고정 */
+  input::placeholder, textarea::placeholder {
+    color: #8c7355 !important;
+    opacity: 0.8 !important;
+  }
+  
+  /* 4. 입력창 선택 시 테두리 색상 진하게 */
+  input:focus, textarea:focus, select:focus {
+    @apply outline-none ring-2 ring-[#4a3424] border-[#4a3424] !important;
+  }
 }
