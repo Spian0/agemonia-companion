@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient'; 
@@ -21,23 +22,23 @@ export default function HeroDetailPage() {
   });
 
   useEffect(() => {
-    if (heroId) fetchHero();
-  }, [heroId]);
+    const fetchHero = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase.from('hero_info').select('*').eq('id', heroId).single();
+        if (error) throw error;
+        setHero(data);
+      } catch (err) { 
+        console.error(err);
+        alert('영웅 정보를 불러오지 못했습니다.');
+        router.push('/hero'); 
+      } finally { 
+        setIsLoading(false); 
+      }
+    };
 
-  const fetchHero = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.from('hero_info').select('*').eq('id', heroId).single();
-      if (error) throw error;
-      setHero(data);
-    } catch (err) { 
-      console.error(err);
-      alert('영웅 정보를 불러오지 못했습니다.');
-      router.push('/hero'); 
-    } finally { 
-      setIsLoading(false); 
-    }
-  };
+    if (heroId) fetchHero();
+  }, [heroId, router]);
 
   const openEditModal = () => {
     setEditHero({ ...hero, previewUrl: hero.profile_url, file: null });
@@ -148,7 +149,6 @@ export default function HeroDetailPage() {
           </h2>
           {hero.player && <span className="text-[#5c4a3d] font-bold mb-4 text-lg">({hero.player})</span>}
 
-          {/* 상세 페이지에서도 클래스와 직업을 명확하게 표시 */}
           <div className="flex gap-2 mt-2">
             <span className="bg-[#1c3540] text-[#d6dbe0] px-3 py-1 rounded text-sm font-bold border border-[#4a6370] shadow-sm">클래스: {hero.hero_class || '-'}</span>
             <span className="bg-[#4a3424] text-[#d4b886] px-3 py-1 rounded text-sm font-bold border border-[#251811] shadow-sm">직업: {hero.job || '-'}</span>

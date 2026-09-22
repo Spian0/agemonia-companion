@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient'; 
@@ -101,14 +102,14 @@ export default function HeroPage() {
         <div className="bg-gradient-to-b from-[#2a1d15] to-[#1a120c] py-4 my-6 border-y-2 border-[#5a4635] shadow-[0_4px_6px_rgba(0,0,0,0.5)]">
           <h1 className="text-center text-[#d4b886] text-2xl tracking-widest font-extrabold uppercase relative" style={{ textShadow: '2px 2px 2px rgba(0,0,0,0.8)' }}>
             <span className="absolute left-4 opacity-50">✦</span>
-            영웅 목록
+            HEROES
             <span className="absolute right-4 opacity-50">✦</span>
           </h1>
         </div>
 
         <div className="px-6 py-4">
           <div className="flex justify-between items-center border-b-2 border-[#b89e7c] pb-2 mb-4">
-            <h3 className="text-xl italic text-[#3e2723] font-semibold">파티 멤버</h3>
+            <h3 className="text-xl italic text-[#3e2723] font-semibold">Party Members</h3>
             <button onClick={openNewModal} className="w-8 h-8 rounded-full bg-gradient-to-b from-[#4e3626] to-[#251811] text-[#d4b886] font-bold text-xl border border-[#140d09] shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] flex items-center justify-center pb-1">+</button>
           </div>
           
@@ -141,7 +142,6 @@ export default function HeroPage() {
                     {hero.player && <span className="text-sm text-[#5c4a3d] ml-1">({hero.player})</span>}
                   </div>
                   
-                  {/* 클래스와 직업을 항상 고정적으로 표시 */}
                   <div className="flex gap-2 mt-2">
                     <span className="bg-[#1c3540] text-[#d6dbe0] px-2 py-0.5 rounded text-[11px] font-bold border border-[#4a6370] shadow-sm">클래스: {hero.hero_class || '-'}</span>
                     <span className="bg-[#4a3424] text-[#d4b886] px-2 py-0.5 rounded text-[11px] font-bold border border-[#251811] shadow-sm">직업: {hero.job || '-'}</span>

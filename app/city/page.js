@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
@@ -170,13 +171,11 @@ export default function CityPage() {
   const allServices = locations.flatMap(loc => loc.services.map(svc => ({ ...svc, locationId: loc.id, locationName: loc.name, locationCode: loc.code })));
   const allActivities = locations.flatMap(loc => loc.activities.map(act => ({ ...act, locationId: loc.id, locationName: loc.name, locationCode: loc.code })));
 
-  // 서비스 탭에서 보여줄 통합 판매 데이터 모으기
   const globalCards = [];
   const globalTokens = [];
   locations.forEach(loc => {
     loc.services.filter(isSalesAction).forEach(svc => {
       svc.options?.forEach(opt => {
-        // 비용에서 텍스트 빼고 '숫자'만 추출
         const costVal = (opt.costs && opt.costs.length > 0) ? opt.costs.map(c => c.value).join('/') : '무료';
         opt.rewards?.forEach(r => {
           if (r.type === 'item') {
@@ -191,7 +190,6 @@ export default function CityPage() {
 
   if (isLoading) return <div className="min-h-screen bg-[#dccba6] p-6 text-center font-bold text-[#3e2723]">로딩 중...</div>;
 
-  // 장소 탭 및 일반 텍스트용 액션 블록 (사진 클릭 확대 적용됨)
   const ActionDetails = ({ action, showBaseText = false }) => (
     <div className="mt-2 text-sm bg-white bg-opacity-40 p-2 rounded border border-[#a38c6d]">
       {showBaseText && action.baseText && <div className="mb-3 text-[#3e2723] font-semibold leading-relaxed whitespace-pre-wrap">{action.baseText}</div>}
@@ -219,15 +217,13 @@ export default function CityPage() {
                         <span className="text-[#3e2723] font-semibold">- {r.text}</span>
                       ) : (
                         <div className="flex gap-2 bg-white p-2 rounded items-start border border-[#a38c6d] shadow-sm">
-                          {/* 사진 크게 보기 버튼을 뺀 아이템 블록 */}
                           <div className="flex flex-col items-center gap-1 shrink-0">
                             {r.imageUrl ? (
                               <img 
                                 src={r.imageUrl} 
-                                alt="item" 
+                                alt="item preview" 
                                 onClick={(e) => { e.stopPropagation(); setPreviewImageUrl(r.imageUrl); }}
                                 className="w-14 h-14 object-contain bg-black bg-opacity-5 rounded border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity" 
-                                title="사진 크게 보기"
                               />
                             ) : (
                               <div className="w-14 h-14 bg-gray-200 flex items-center justify-center rounded border border-gray-400 text-[10px] text-gray-500 text-center font-bold">사진<br/>없음</div>
@@ -262,11 +258,10 @@ export default function CityPage() {
 
         <div className="flex bg-[#c5b399] p-1 rounded-lg border-2 border-[#a38c6d] mb-6 shadow">
           <button onClick={() => setActiveTab('locations')} className={`flex-1 py-2 font-bold text-sm rounded-md transition-colors ${activeTab === 'locations' ? 'bg-[#5d4037] text-white' : 'text-[#3e2723]'}`}>🏰 장소</button>
-          <button onClick={() => setActiveTab('services')} className={`flex-1 py-2 font-bold text-sm rounded-md transition-colors ${activeTab === 'services' ? 'bg-[#5d4037] text-white' : 'text-[#3e2723]'}`}>📜 서비스</button>
+          <button onClick={() => setActiveTab('services')} className={`flex-1 py-2 font-bold text-sm rounded-md transition-colors ${activeTab === 'services' ? 'bg-[#5d4037] text-white' : 'text-[#3e2723]'}`}>📜 서비스/판매</button>
           <button onClick={() => setActiveTab('activities')} className={`flex-1 py-2 font-bold text-sm rounded-md transition-colors ${activeTab === 'activities' ? 'bg-[#5d4037] text-white' : 'text-[#3e2723]'}`}>⚔️ 활동</button>
         </div>
 
-        {/* 1. 장소 탭 (기존과 동일하게 유지 + 돋보기 버튼만 제거) */}
         {activeTab === 'locations' && (
           <div>
             <div className="flex justify-between items-center mb-4">
@@ -334,24 +329,20 @@ export default function CityPage() {
           </div>
         )}
 
-        {/* 2. 통합 서비스/판매 탭 */}
         {activeTab === 'services' && (
           <div className="space-y-6">
-            
-            {/* 판매(아이템) 통합 표 */}
             <div>
               <h3 className="font-bold text-xl italic text-[#3e2723] border-b-2 border-[#a38c6d] pb-1 mb-3">💰 전체 판매 목록</h3>
               <div className="space-y-4">
-                
                 {globalCards.length > 0 && (
                   <div>
-                    <h5 className="font-extrabold text-[#3e2723] mb-1 flex items-center gap-1">🃏 카드 목록</h5>
+                    <h5 className="font-extrabold text-[#3e2723] mb-1">🃏 카드 목록</h5>
                     <div className="overflow-x-auto rounded border border-[#a68d6c] shadow-sm">
                       <table className="w-full text-center border-collapse whitespace-nowrap">
                         <thead className="bg-[#5d4037] text-[#e9e0d2] text-[11px] uppercase">
                           <tr>
                             <th className="p-1.5 border-r border-[#8c7355]">장소</th>
-                            <th className="p-1.5 border-r border-[#8c7355]">⭐</th>
+                            <th className="p-1.5 border-r border-[#8c7355]">가격</th>
                             <th className="p-1.5 border-r border-[#8c7355]">번호</th>
                             <th className="p-1.5 border-r border-[#8c7355] w-full text-left pl-2">이름</th>
                             <th className="p-1.5 w-10">보기</th>
@@ -383,13 +374,13 @@ export default function CityPage() {
 
                 {globalTokens.length > 0 && (
                   <div>
-                    <h5 className="font-extrabold text-[#3e2723] mb-1 flex items-center gap-1">🪙 토큰 목록</h5>
+                    <h5 className="font-extrabold text-[#3e2723] mb-1">🪙 토큰 목록</h5>
                     <div className="overflow-x-auto rounded border border-[#a68d6c] shadow-sm">
                       <table className="w-full text-center border-collapse whitespace-nowrap">
                         <thead className="bg-[#2a453b] text-[#e9e0d2] text-[11px] uppercase">
                           <tr>
                             <th className="p-1.5 border-r border-[#1a2d26]">장소</th>
-                            <th className="p-1.5 border-r border-[#1a2d26]">⭐</th>
+                            <th className="p-1.5 border-r border-[#1a2d26]">가격</th>
                             <th className="p-1.5 border-r border-[#1a2d26] w-full text-left pl-2">이름</th>
                             <th className="p-1.5 border-r border-[#1a2d26]">되팔기</th>
                             <th className="p-1.5 w-10">보기</th>
@@ -421,7 +412,6 @@ export default function CityPage() {
               </div>
             </div>
 
-            {/* 일반 서비스 목록 */}
             <div className="pt-4 border-t-4 border-dashed border-[#a38c6d]">
               <h3 className="font-bold text-xl italic text-[#3e2723] border-b-2 border-[#a38c6d] pb-1 mb-3">📜 전체 제공 서비스</h3>
               <div className="space-y-3">
@@ -456,7 +446,6 @@ export default function CityPage() {
         )}
       </div>
 
-      {/* 장소 추가/수정 모달 */}
       {isLocModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[100] p-4">
           <div className="bg-[#e9e0d2] w-full max-w-sm rounded-xl border-4 border-[#5d4037] flex flex-col max-h-[85vh] shadow-2xl">
@@ -487,7 +476,6 @@ export default function CityPage() {
         </div>
       )}
 
-      {/* 액션(서비스/판매/활동) 모달 */}
       {isActionModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[100] p-4">
           <div className="bg-[#e9e0d2] w-full max-w-md rounded-xl border-4 border-[#5d4037] flex flex-col max-h-[85vh] shadow-2xl">
@@ -499,7 +487,7 @@ export default function CityPage() {
             
             <div className="p-4 overflow-y-auto grow space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[#3e2723] mb-1">이름 (아이템 등록 시 '💰판매'로 자동분류 됨)</label>
+                <label className="block text-xs font-bold text-[#3e2723] mb-1">이름 (아이템 등록 시 &apos;💰판매&apos;로 자동분류 됨)</label>
                 <input type="text" className="w-full p-2 border rounded font-bold text-[#3e2723]" value={actionData.name} onChange={e => setActionData({...actionData, name: e.target.value})} />
               </div>
               <div>
@@ -568,7 +556,7 @@ export default function CityPage() {
                                 <input type="text" className="w-full p-1.5 border rounded font-bold text-sm" value={reward.attr} onChange={e => handleRewardChange(oIdx, rIdx, 'attr', e.target.value)} />
                               </div>
                               <div>
-                                <label className="block text-[10px] font-bold text-[#5d4037] mb-1">사진 업로드 (터치해서 등록)</label>
+                                <label className="block text-[10px] font-bold text-[#5d4037] mb-1">사진 업로드</label>
                                 <input type="file" accept="image/*" onChange={(e) => handleRewardImageChange(oIdx, rIdx, e)} className="w-full text-[10px] font-bold mt-1 bg-white p-1 rounded border border-[#a38c6d]" />
                               </div>
                               
@@ -576,9 +564,9 @@ export default function CityPage() {
                                 <div className="mt-2 p-2 bg-white rounded border border-[#a38c6d] inline-block shadow-sm">
                                   <img 
                                     src={reward.imagePreview || reward.imageUrl} 
+                                    alt="preview"
                                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPreviewImageUrl(reward.imagePreview || reward.imageUrl); }}
                                     className="h-16 object-contain rounded cursor-pointer hover:opacity-80 transition-opacity" 
-                                    title="사진 크게 보기"
                                   />
                                 </div>
                               )}
@@ -600,7 +588,6 @@ export default function CityPage() {
         </div>
       )}
 
-      {/* 이미지 확대 뷰어 모달 */}
       {previewImageUrl && (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[200] p-4" onClick={() => setPreviewImageUrl(null)}>
           <div className="relative" onClick={e => e.stopPropagation()}>
