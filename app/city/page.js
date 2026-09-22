@@ -269,7 +269,25 @@ export default function CityPage() {
                 <div key={loc.id} className="bg-[#c5b399] border-2 border-[#a38c6d] rounded-lg p-3 shadow-md">
                   <div onClick={() => toggleLoc(loc.id)} className="cursor-pointer flex justify-between items-center p-1">
                     <div className="flex items-center">
-                      <span className="bg-[#5d4037] text-white w-7 h-7 flex items-center justify-center rounded font-bold mr-2 text-sm shadow-inner border border-[#3e2723]">{loc.code}</span>
+                    <div className="relative inline-flex items-center justify-center shrink-0 mr-2 align-middle">
+                        <img 
+                          src="/ui/location.png" 
+                          alt="location bg" 
+                          // 글자 크기의 1.8배 너비/높이로 자동 조절
+                          className="w-[3em] h-[3em] object-contain drop-shadow-sm"
+                        />
+                        <span 
+                          // 위치를 absolute로 잡아 배경 이미지의 정중앙에 고정
+                          className="absolute z-10 text-white font-extrabold font-serif"
+                          // 글자 크기를 부모보다 약간 작게 조절하고, 그림자를 주어 가독성 확보
+                          style={{ 
+                            fontSize: '0.85em', 
+                            textShadow: '0px 1px 3px rgba(0,0,0,0.9), 0px 0px 2px rgba(0,0,0,0.8)' 
+                          }}
+                        >
+                          {loc.code}
+                        </span>
+                      </div>
                       <span className="text-xl font-extrabold text-[#3e2723] tracking-wide"><IconText text={loc.name} /></span>
                     </div>
                     <div className="flex items-center gap-1">

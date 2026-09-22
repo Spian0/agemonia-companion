@@ -2,7 +2,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient'; 
-import IconText from './components/IconText'; // 🚨 컴포넌트 불러오기
+import IconText from './components/IconText'; 
 
 export default function PartyPage() {
   const [level, setLevel] = useState<number>(1);
@@ -10,12 +10,16 @@ export default function PartyPage() {
   const [keywords, setKeywords] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // 모달 상태 관리
   const [isScenarioModalOpen, setIsScenarioModalOpen] = useState<boolean>(false);
-  const [scenarioToDelete, setScenarioToDelete] = useState<any>(null);
-  const [newScenario, setNewScenario] = useState<any>({ id: null, name: '', number: '', hasExp: false, length: '짧음', isArena: false });
+  const [newScenario, setNewScenario] = useState<any>({ id: null, name: '', number: '', hasExp: false, length: '짧음', isArena: false, active: true });
+  const [scenarioToDelete, setScenarioToDelete] = useState<any>(null); // 영구 삭제용
 
   const [isKeywordModalOpen, setIsKeywordModalOpen] = useState<boolean>(false);
   const [editingKeyword, setEditingKeyword] = useState<any>({ id: null, text: '' });
+
+  // 🚨 아카이브 처리를 위한 공통 확인 모달 상태
+  const [confirmTarget, setConfirmTarget] = useState<{ type: string, item: any } | null>(null);
 
   useEffect(() => {
     async function fetchPartyData() {
@@ -41,7 +45,9 @@ export default function PartyPage() {
 
   const handleSaveScenario = () => {
     if (!newScenario.name || !newScenario.number) return alert('이름과 번호를 입력해주세요.');
-    let updatedScenarios = newScenario.id ? scenarios.map((s: any) => s.id === newScenario.id ? newScenario : s) : [...scenarios, { ...newScenario, id: Date.now() }];
+    let updatedScenarios = newScenario.id 
+      ? scenarios.map((s: any) => s.id === newScenario.id ? newScenario : s) 
+      : [...scenarios, { ...newScenario, id: Date.now(), active: true }]; // 생성 시 기본 active
     setScenarios(updatedScenarios);
     saveToSupabase(level, updatedScenarios, keywords);
     setIsScenarioModalOpen(false);
@@ -58,7 +64,9 @@ export default function PartyPage() {
 
   const handleSaveKeyword = () => {
     if (!editingKeyword.text.trim()) return alert('키워드 내용을 입력해주세요.');
-    let updatedKeywords = editingKeyword.id ? keywords.map((kw: any) => kw.id === editingKeyword.id ? { ...kw, text: editingKeyword.text } : kw) : [...keywords, { id: Date.now(), text: editingKeyword.text, active: true }];
+    let updatedKeywords = editingKeyword.id 
+      ? keywords.map((kw: any) => kw.id === editingKeyword.id ? { ...kw, text: editingKeyword.text } : kw) 
+      : [...keywords, { id: Date.now(), text: editingKeyword.text, active: true }]; // 생성 시 기본 active
     setKeywords(updatedKeywords);
     saveToSupabase(level, scenarios, updatedKeywords);
     setIsKeywordModalOpen(false);
@@ -66,16 +74,22 @@ export default function PartyPage() {
 
   const openEditKeyword = (e: any, kw: any) => { e.stopPropagation(); setEditingKeyword({ id: kw.id, text: kw.text }); setIsKeywordModalOpen(true); };
 
-  const toggleKeywordActive = (id: any) => {
-    const updatedKeywords = keywords.map((kw: any) => kw.id === id ? { ...kw, active: !kw.active } : kw);
-    setKeywords(updatedKeywords);
-    saveToSupabase(level, scenarios, updatedKeywords);
-  };
+  // 🚨 아카이브 완료/삭제 및 복구 처리 로직
+  const handleConfirmAction = () => {
+    if (!confirmTarget) return;
+    const { type, item } = confirmTarget;
 
-  const sortedKeywords = [...keywords].sort((a: any, b: any) => {
-    if (a.active === b.active) return 0;
-    return a.active ? -1 : 1;
-  });
+    if (type === 'complete_scenario' || type === 'restore_scenario') {
+      const updated = scenarios.map((s: any) => s.id === item.id ? { ...s, active: type === 'restore_scenario' } : s);
+      setScenarios(updated);
+      saveToSupabase(level, updated, keywords);
+    } else if (type === 'delete_keyword' || type === 'restore_keyword') {
+      const updated = keywords.map((kw: any) => kw.id === item.id ? { ...kw, active: type === 'restore_keyword' } : kw);
+      setKeywords(updated);
+      saveToSupabase(level, scenarios, updated);
+    }
+    setConfirmTarget(null);
+  };
 
   const getCardTheme = (length: any) => {
     if (length === '짧음') return { bg: 'bg-[#243d25]', border: 'border-[#4a684b]', text: 'text-[#d8e3d8]', num: 'text-[#9cb59c]' };
@@ -85,6 +99,12 @@ export default function PartyPage() {
   };
 
   if (isLoading) return <div className="min-h-screen bg-[#dccba6] p-6 text-center font-serif font-bold text-[#3e2723]">데이터를 불러오는 중입니다...</div>;
+
+  // 상태에 따른 분류 (이전 데이터 호환성을 위해 active가 false가 아니면 모두 진행 중으로 간주)
+  const activeScenarios = scenarios.filter((s: any) => s.active !== false);
+  const archivedScenarios = scenarios.filter((s: any) => s.active === false);
+  const activeKeywords = keywords.filter((k: any) => k.active !== false);
+  const archivedKeywords = keywords.filter((k: any) => k.active === false);
 
   return (
     <div className="min-h-screen bg-[#dccba6] p-2 md:p-6 font-serif">
@@ -109,23 +129,34 @@ export default function PartyPage() {
           </div>
         </div>
 
+        {/* 1. 보유 중 시나리오 영역 */}
         <div className="px-6 py-4">
           <div className="flex justify-between items-center border-b-2 border-[#b89e7c] pb-2 mb-4">
             <h3 className="text-lg text-[#3e2723] font-extrabold tracking-wide">보유 중 시나리오</h3>
-            <button onClick={() => { setNewScenario({ id: null, name: '', number: '', hasExp: false, length: '짧음', isArena: false }); setIsScenarioModalOpen(true); }} className="w-7 h-7 rounded-full bg-gradient-to-b from-[#4e3626] to-[#251811] text-[#d4b886] font-bold border border-[#140d09] shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] flex items-center justify-center">+</button>
+            <button onClick={() => { setNewScenario({ id: null, name: '', number: '', hasExp: false, length: '짧음', isArena: false, active: true }); setIsScenarioModalOpen(true); }} className="w-7 h-7 rounded-full bg-gradient-to-b from-[#4e3626] to-[#251811] text-[#d4b886] font-bold border border-[#140d09] shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] flex items-center justify-center">+</button>
           </div>
           
           <div className="space-y-3">
-            {scenarios.map((scenario: any) => {
+            {activeScenarios.length === 0 && <div className="text-center text-[#8a765f] font-bold py-2 text-sm">진행 중인 시나리오가 없습니다.</div>}
+            {activeScenarios.map((scenario: any) => {
               const theme = getCardTheme(scenario.length);
               return (
-                <div key={scenario.id} className={`${theme.bg} border-2 ${theme.border} rounded-md p-3 shadow-md relative group`}>
+                <div 
+                  key={scenario.id} 
+                  onClick={() => setConfirmTarget({ type: 'complete_scenario', item: scenario })}
+                  className={`${theme.bg} border-2 ${theme.border} rounded-md p-3 shadow-md relative group cursor-pointer hover:scale-[1.01] transition-transform`}
+                >
                   <div className="flex justify-between items-center mb-1">
                     <span className={`${theme.text} text-lg font-extrabold tracking-wide flex items-center gap-1`}>
                       {scenario.hasExp && <span className="text-yellow-400 drop-shadow-md text-[17px]" title="경험치 획득 가능">⭐</span>}
                       <IconText text={scenario.name} />
                     </span>
-                    <span className={`${theme.num} text-xl font-bold font-serif`}>{scenario.number}</span>
+                    <div className="relative flex items-center justify-center w-11 h-11 shrink-0">
+                      <img src="/ui/scenario.png" alt="scenario bg" className="absolute inset-0 w-full h-full object-contain drop-shadow-lg" />
+                      <span className="relative z-10 text-white text-[22px] font-extrabold font-serif pb-1" style={{ textShadow: '0px 1px 4px rgba(0,0,0,0.9), 0px 0px 2px rgba(0,0,0,0.8)' }}>
+                        {scenario.number}
+                      </span>
+                    </div>
                   </div>
                   
                   <div className="flex gap-2 text-[11px] font-bold uppercase tracking-wider mt-1.5">
@@ -133,9 +164,9 @@ export default function PartyPage() {
                     {scenario.isArena && <span className="bg-[#4a1c18] text-[#e8dcc8] px-2 py-0.5 rounded-sm shadow-sm border border-[#8a4a4a]">투기장</span>}
                   </div>
                   
-                  <div className="absolute top-2 right-10 hidden group-hover:flex gap-1">
+                  <div className="absolute top-2 right-14 hidden group-hover:flex gap-1 z-20">
                     <button onClick={(e) => openEditScenario(e, scenario)} className="bg-[#d4b886] text-[#3e2723] px-2 py-1 rounded text-xs font-bold border border-[#a68c63]">수정</button>
-                    <button onClick={() => setScenarioToDelete(scenario)} className="bg-red-900 text-white px-2 py-1 rounded text-xs font-bold border border-red-700">삭제</button>
+                    <button onClick={(e) => { e.stopPropagation(); setScenarioToDelete(scenario); }} className="bg-red-900 text-white px-2 py-1 rounded text-xs font-bold border border-red-700">삭제</button>
                   </div>
                 </div>
               );
@@ -143,6 +174,7 @@ export default function PartyPage() {
           </div>
         </div>
 
+        {/* 2. 보유 중 키워드 영역 */}
         <div className="px-6 py-2">
           <div className="flex justify-between items-center border-b-2 border-[#b89e7c] pb-2 mb-4">
             <h3 className="text-lg text-[#3e2723] font-extrabold tracking-wide">보유 중 키워드</h3>
@@ -150,24 +182,92 @@ export default function PartyPage() {
           </div>
           
           <div className="space-y-1.5">
-            {sortedKeywords.map((kw: any) => (
+            {activeKeywords.length === 0 && <div className="text-center text-[#8a765f] font-bold py-2 text-sm">진행 중인 키워드가 없습니다.</div>}
+            {activeKeywords.map((kw: any) => (
               <div 
                 key={kw.id} 
-                onClick={() => toggleKeywordActive(kw.id)} 
-                className={`flex justify-between items-center p-2 rounded-sm shadow-sm border border-[#a68d6c] font-bold text-[15px] cursor-pointer transition-colors tracking-wide
-                  ${kw.active ? 'bg-[#c7aa81] text-[#3e2723]' : 'bg-[#a39481] text-[#5e4b3c] line-through opacity-70'}
-                `}
+                onClick={() => setConfirmTarget({ type: 'delete_keyword', item: kw })} 
+                className="flex justify-between items-center p-2 rounded-sm shadow-sm border border-[#a68d6c] font-bold text-[15px] cursor-pointer hover:bg-[#b59a72] transition-colors tracking-wide bg-[#c7aa81] text-[#3e2723]"
               >
                 <span><IconText text={kw.text} /></span>
-                <div className="flex gap-1">
-                  <button onClick={(e) => openEditKeyword(e, kw)} className="text-[10px] bg-[#4e3626] text-[#d4b886] px-2 py-1 rounded-sm border border-[#251811] no-underline hover:bg-[#3e2723]">수정</button>
+                <button onClick={(e) => openEditKeyword(e, kw)} className="text-[10px] bg-[#4e3626] text-[#d4b886] px-2 py-1 rounded-sm border border-[#251811] hover:bg-[#3e2723]">수정</button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 3. 아카이브 (완료 및 삭제됨) 영역 */}
+        <div className="px-6 py-6 mt-4 border-t-4 border-dashed border-[#a68d6c]">
+          <h3 className="text-lg text-[#5e4b3c] font-extrabold tracking-wide mb-4">🗃️ 아카이브 (완료 / 삭제)</h3>
+          
+          <div className="space-y-3 mb-4">
+            {archivedScenarios.map((scenario: any) => {
+              const theme = getCardTheme(scenario.length);
+              return (
+                <div 
+                  key={scenario.id} 
+                  onClick={() => setConfirmTarget({ type: 'restore_scenario', item: scenario })}
+                  className={`${theme.bg} border-2 ${theme.border} rounded-md p-3 relative cursor-pointer grayscale opacity-60 hover:opacity-80 transition-opacity`}
+                >
+                  <div className="flex justify-between items-center mb-1">
+                    <span className={`${theme.text} text-lg font-extrabold tracking-wide line-through flex items-center gap-1`}><IconText text={scenario.name} /></span>
+                    <div className="relative flex items-center justify-center w-11 h-11 shrink-0">
+                      <img src="/ui/scenario.png" alt="scenario bg" className="absolute inset-0 w-full h-full object-contain" />
+                      <span className="relative z-10 text-white text-[22px] font-extrabold font-serif pb-1">
+                        {scenario.number}
+                      </span>
+                    </div>
+                  </div>
                 </div>
+              );
+            })}
+          </div>
+
+          <div className="space-y-1.5">
+            {archivedKeywords.map((kw: any) => (
+              <div 
+                key={kw.id} 
+                onClick={() => setConfirmTarget({ type: 'restore_keyword', item: kw })} 
+                className="flex justify-between items-center p-2 rounded-sm border border-[#8c7355] font-bold text-[15px] cursor-pointer hover:bg-[#8c7a65] transition-colors tracking-wide bg-[#a39481] text-[#5e4b3c] line-through opacity-70"
+              >
+                <span><IconText text={kw.text} /></span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
+      {/* 액션 확인 모달 (완료/삭제/복구) */}
+      {confirmTarget && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[100] p-4 font-serif">
+          <div className="bg-[#d0bc9b] p-6 rounded-xl w-full max-w-xs text-center border-4 border-[#4a3424] shadow-2xl">
+            <h2 className="text-lg font-bold mb-6 text-[#3e2723] whitespace-pre-wrap leading-relaxed">
+              {confirmTarget.type === 'complete_scenario' && '해당 시나리오를 완료 했습니까?'}
+              {confirmTarget.type === 'delete_keyword' && '해당 키워드를 지웁니다'}
+              {(confirmTarget.type === 'restore_scenario' || confirmTarget.type === 'restore_keyword') && '복구하시겠습니까?'}
+            </h2>
+            <div className="flex gap-2">
+              <button onClick={handleConfirmAction} className="flex-1 bg-[#4a1c18] text-white py-2 rounded font-bold border border-[#2b0f0d]">예</button>
+              <button onClick={() => setConfirmTarget(null)} className="flex-1 bg-transparent border-2 border-[#4a3424] text-[#4a3424] py-2 rounded font-bold">아니오</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 영구 삭제 모달 (시나리오) */}
+      {scenarioToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[100] p-4 font-serif">
+          <div className="bg-[#d0bc9b] p-6 rounded-xl w-full max-w-xs text-center border-4 border-[#4a3424] shadow-2xl">
+            <h2 className="text-lg font-bold mb-5 text-[#3e2723]">완전히 영구 삭제하시겠습니까?</h2>
+            <div className="flex gap-2">
+              <button onClick={handleDeleteScenario} className="flex-1 bg-[#4a1c18] text-white py-2 rounded font-bold border border-[#2b0f0d]">예 (삭제)</button>
+              <button onClick={() => setScenarioToDelete(null)} className="flex-1 bg-transparent border-2 border-[#4a3424] text-[#4a3424] py-2 rounded font-bold">아니오</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 시나리오 생성/수정 모달 */}
       {isScenarioModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[100] p-4 font-serif">
           <div className="bg-[#d0bc9b] p-6 rounded-xl w-full max-w-sm border-4 border-[#4a3424] shadow-2xl">
@@ -193,6 +293,7 @@ export default function PartyPage() {
         </div>
       )}
 
+      {/* 키워드 생성/수정 모달 */}
       {isKeywordModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[100] p-4 font-serif">
           <div className="bg-[#d0bc9b] p-6 rounded-xl w-full max-w-xs border-4 border-[#4a3424] shadow-2xl">
@@ -201,18 +302,6 @@ export default function PartyPage() {
             <div className="flex gap-2">
               <button onClick={() => setIsKeywordModalOpen(false)} className="flex-1 bg-transparent border-2 border-[#4a3424] text-[#4a3424] py-2 rounded font-bold">취소</button>
               <button onClick={handleSaveKeyword} className="flex-1 bg-gradient-to-b from-[#4e3626] to-[#251811] text-[#d4b886] border border-[#140d09] py-2 rounded font-bold">저장</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {scenarioToDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[100] p-4 font-serif">
-          <div className="bg-[#d0bc9b] p-6 rounded-xl w-full max-w-xs text-center border-4 border-[#4a3424] shadow-2xl">
-            <h2 className="text-lg font-bold mb-5 text-[#3e2723]">정말 삭제하시겠습니까?</h2>
-            <div className="flex gap-2">
-              <button onClick={handleDeleteScenario} className="flex-1 bg-[#4a1c18] text-white py-2 rounded font-bold border border-[#2b0f0d]">예 (삭제)</button>
-              <button onClick={() => setScenarioToDelete(null)} className="flex-1 bg-transparent border-2 border-[#4a3424] text-[#4a3424] py-2 rounded font-bold">아니오</button>
             </div>
           </div>
         </div>
