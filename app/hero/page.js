@@ -1,8 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient'; 
+import { useRouter } from 'next/navigation';
 
 export default function HeroPage() {
+  const router = useRouter();
   const [heroes, setHeroes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -10,14 +12,7 @@ export default function HeroPage() {
   const [isUploading, setIsUploading] = useState(false);
   
   const [editHero, setEditHero] = useState({ 
-    id: null, 
-    name: '', 
-    player: '', 
-    hero_class: '', 
-    job: '', 
-    profile_url: null, 
-    previewUrl: null, 
-    file: null 
+    id: null, name: '', player: '', hero_class: '', job: '', profile_url: null, previewUrl: null, file: null 
   });
 
   useEffect(() => {
@@ -41,10 +36,7 @@ export default function HeroPage() {
     if (!file) return null;
     const fileName = `hero_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${file.name.split('.').pop()}`;
     const { error } = await supabase.storage.from('agemonia_images').upload(fileName, file);
-    if (error) {
-      alert(`사진 업로드 실패!\n에러: ${error.message}`);
-      return null;
-    }
+    if (error) return null;
     return supabase.storage.from('agemonia_images').getPublicUrl(fileName).data.publicUrl;
   };
 
@@ -67,11 +59,9 @@ export default function HeroPage() {
     };
 
     if (editHero.id) {
-      const { error } = await supabase.from('hero_info').update(savedData).eq('id', editHero.id);
-      if (error) alert('수정 실패: ' + error.message);
+      await supabase.from('hero_info').update(savedData).eq('id', editHero.id);
     } else {
-      const { error } = await supabase.from('hero_info').insert([savedData]);
-      if (error) alert('추가 실패: ' + error.message);
+      await supabase.from('hero_info').insert([savedData]);
     }
 
     await fetchHeroes(); 
@@ -80,12 +70,8 @@ export default function HeroPage() {
   };
 
   const openEditModal = (e, hero) => {
-    e.stopPropagation();
-    setEditHero({ 
-      ...hero, 
-      previewUrl: hero.profile_url, 
-      file: null 
-    });
+    e.stopPropagation(); 
+    setEditHero({ ...hero, previewUrl: hero.profile_url, file: null });
     setIsModalOpen(true);
   };
 
@@ -95,26 +81,15 @@ export default function HeroPage() {
   };
 
   const handleDelete = async (e, id) => {
-    e.stopPropagation();
+    e.stopPropagation(); 
     if(!confirm('이 영웅을 파티에서 제외(삭제)하시겠습니까?')) return;
-    
-    const { error } = await supabase.from('hero_info').delete().eq('id', id);
-    if (error) {
-      alert('삭제 실패: ' + error.message);
-    } else {
-      fetchHeroes();
-    }
+    await supabase.from('hero_info').delete().eq('id', id);
+    fetchHeroes();
   };
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      setEditHero({ 
-        ...editHero, 
-        file: file, 
-        previewUrl: URL.createObjectURL(file) 
-      });
-    }
+    if (file) setEditHero({ ...editHero, file: file, previewUrl: URL.createObjectURL(file) });
   };
 
   if (isLoading) return <div className="min-h-screen bg-[#dccba6] p-6 text-center font-serif font-bold text-[#3e2723]">영웅 정보를 불러오는 중입니다...</div>;
@@ -145,8 +120,11 @@ export default function HeroPage() {
             )}
 
             {heroes.map((hero) => (
-              <div key={hero.id} className="bg-gradient-to-r from-[#e0d0b6] to-[#d0bc9b] border-2 border-[#8c7355] rounded-lg p-3 shadow-md flex items-center gap-4 relative group">
-                
+              <div 
+                key={hero.id} 
+                onClick={() => router.push(`/hero/${hero.id}`)} 
+                className="bg-gradient-to-r from-[#e0d0b6] to-[#d0bc9b] border-2 border-[#8c7355] rounded-lg p-3 shadow-md flex items-center gap-4 cursor-pointer hover:scale-[1.02] transition-transform"
+              >
                 <div className="shrink-0 relative">
                   <div className="w-20 h-20 rounded-full border-4 border-[#4a3424] shadow-inner bg-[#3e2723] flex items-center justify-center overflow-hidden">
                     {hero.profile_url ? (
@@ -162,23 +140,17 @@ export default function HeroPage() {
                     {hero.name} 
                     {hero.player && <span className="text-sm text-[#5c4a3d] ml-1">({hero.player})</span>}
                   </div>
-                  <div className="flex gap-1 flex-wrap mt-1">
-                    {hero.hero_class && (
-                      <span className="bg-[#1c3540] text-[#d6dbe0] px-2 py-0.5 rounded text-xs font-bold uppercase tracking-widest border border-[#4a6370] shadow-sm">
-                        {hero.hero_class}
-                      </span>
-                    )}
-                    {hero.job && (
-                      <span className="bg-[#4a3424] text-[#d4b886] px-2 py-0.5 rounded text-xs font-bold uppercase tracking-widest border border-[#251811] shadow-sm">
-                        {hero.job}
-                      </span>
-                    )}
+                  
+                  {/* 클래스와 직업을 항상 고정적으로 표시 */}
+                  <div className="flex gap-2 mt-2">
+                    <span className="bg-[#1c3540] text-[#d6dbe0] px-2 py-0.5 rounded text-[11px] font-bold border border-[#4a6370] shadow-sm">클래스: {hero.hero_class || '-'}</span>
+                    <span className="bg-[#4a3424] text-[#d4b886] px-2 py-0.5 rounded text-[11px] font-bold border border-[#251811] shadow-sm">직업: {hero.job || '-'}</span>
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-2 shrink-0">
-                  <button onClick={(e) => openEditModal(e, hero)} className="bg-[#4e3626] text-[#d4b886] px-3 py-1 rounded text-xs font-bold border border-[#140d09] shadow">수정</button>
-                  <button onClick={(e) => handleDelete(e, hero.id)} className="bg-[#5c2a2a] text-[#e8dcc8] px-3 py-1 rounded text-xs font-bold border border-[#3d1818] shadow">삭제</button>
+                  <button onClick={(e) => openEditModal(e, hero)} className="bg-[#4e3626] text-[#d4b886] px-3 py-1 rounded text-xs font-bold border border-[#140d09] shadow hover:bg-[#3e2723]">수정</button>
+                  <button onClick={(e) => handleDelete(e, hero.id)} className="bg-[#5c2a2a] text-[#e8dcc8] px-3 py-1 rounded text-xs font-bold border border-[#3d1818] shadow hover:bg-[#4a1c18]">삭제</button>
                 </div>
               </div>
             ))}
@@ -215,18 +187,18 @@ export default function HeroPage() {
                 </div>
                 <div className="w-24">
                   <label className="block text-sm font-bold text-[#3e2723] mb-1">플레이어</label>
-                  <input type="text" className="w-full p-2 bg-[#e0d0b6] border border-[#a68d6c] rounded font-bold text-[#3e2723]" value={editHero.player || ''} onChange={e => setEditHero({...editHero, player: e.target.value})} placeholder="" />
+                  <input type="text" className="w-full p-2 bg-[#e0d0b6] border border-[#a68d6c] rounded font-bold text-[#3e2723]" value={editHero.player || ''} onChange={e => setEditHero({...editHero, player: e.target.value})} />
                 </div>
               </div>
 
               <div className="flex gap-2">
                 <div className="flex-1">
                   <label className="block text-sm font-bold text-[#3e2723] mb-1">클래스</label>
-                  <input type="text" className="w-full p-2 bg-[#e0d0b6] border border-[#a68d6c] rounded font-bold text-[#3e2723]" value={editHero.hero_class || ''} onChange={e => setEditHero({...editHero, hero_class: e.target.value})} placeholder="" />
+                  <input type="text" className="w-full p-2 bg-[#e0d0b6] border border-[#a68d6c] rounded font-bold text-[#3e2723]" value={editHero.hero_class || ''} onChange={e => setEditHero({...editHero, hero_class: e.target.value})} />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-sm font-bold text-[#3e2723] mb-1">직업</label>
-                  <input type="text" className="w-full p-2 bg-[#e0d0b6] border border-[#a68d6c] rounded font-bold text-[#3e2723]" value={editHero.job || ''} onChange={e => setEditHero({...editHero, job: e.target.value})} placeholder="" />
+                  <label className="block text-sm font-bold text-[#3e2723] mb-1">직업 / 역할</label>
+                  <input type="text" className="w-full p-2 bg-[#e0d0b6] border border-[#a68d6c] rounded font-bold text-[#3e2723]" value={editHero.job || ''} onChange={e => setEditHero({...editHero, job: e.target.value})} />
                 </div>
               </div>
             </div>
