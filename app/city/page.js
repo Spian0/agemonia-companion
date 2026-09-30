@@ -33,42 +33,78 @@ export default function CityPage() {
   useEffect(() => {
     async function fetchData() {
       try {
+        // 파티 레벨 불러오기
         const { data: partyData } = await supabase.from('party_info').select('level').limit(1).maybeSingle();
         if (partyData) setCurrentPartyLevel(partyData.level);
 
-        const { data: cityData } = await supabase.from('city_data').select('locations').limit(1).maybeSingle();
-        if (cityData && cityData.locations) {
-          const migratedLocs = cityData.locations.map(loc => ({
-            ...loc,
-            services: (loc.services || []).map(svc => {
-              if (svc.options) return svc;
-              return { ...svc, options: [{ costs: svc.costs || [], rewards: svc.rewards || (svc.resultType ? [{ type: svc.resultType, text: svc.resultText, itemType: svc.itemType, name: svc.itemName, attr: svc.itemAttr, imageUrl: svc.imageUrl }] : []) }] };
-            }),
-            activities: (loc.activities || []).map(act => {
-              if (act.options) return act;
-              return { ...act, options: [{ costs: act.costs || [], rewards: act.rewards || (act.resultType ? [{ type: act.resultType, text: act.resultText, itemType: act.itemType, name: act.itemName, attr: act.itemAttr, imageUrl: act.imageUrl }] : []) }] };
-            })
+        // 3개의 분리된 테이블에서 각각 데이터 불러오기
+        const [ { data: locData }, { data: svcData }, { data: actData } ] = await Promise.all([
+          supabase.from('city_locations').select('*').order('id', { ascending: true }),
+          supabase.from('city_services').select('*').order('id', { ascending: true }),
+          supabase.from('city_activities').select('*').order('id', { ascending: true })
+        ]);
+
+        // 분리된 데이터를 UI에서 쓰던 중첩 구조(locations 안에 services, activities 포함)로 다시 조립
+        if (locData) {
+          const assembledLocs = locData.map(loc => ({
+            id: loc.id,
+            code: loc.code,
+            name: loc.name,
+            level: loc.level,
+            baseText: loc.base_text, // snake_case를 UI용 camelCase로 변환
+            services: (svcData || []).filter(s => s.location_id === loc.id).map(s => ({
+              id: s.id,
+              name: s.name,
+              baseText: s.base_text,
+              options: s.options || []
+            })),
+            activities: (actData || []).filter(a => a.location_id === loc.id).map(a => ({
+              id: a.id,
+              name: a.name,
+              baseText: a.base_text,
+              options: a.options || []
+            }))
           }));
-          setLocations(migratedLocs);
+          setLocations(assembledLocs);
         }
-      } catch (err) { console.error(err); } finally { setIsLoading(false); }
+      } catch (err) { 
+        console.error(err); 
+      } finally { 
+        setIsLoading(false); 
+      }
     }
     fetchData();
   }, []);
 
-  const saveLocations = async (updatedLocations) => {
-    setLocations(updatedLocations);
-    const { error } = await supabase.from('city_data').upsert({ id: 1, locations: updatedLocations });
-    if (error) alert('DB 저장 실패! 원인: ' + error.message);
-  };
-
   const toggleLoc = (id) => setExpandedLocs(prev => ({ ...prev, [id]: !prev[id] }));
 
-  const handleSaveLocation = () => {
+  // [수정됨] 장소 전용 테이블에 저장
+  const handleSaveLocation = async () => {
     if (!newLocation.name || !newLocation.code) return alert('이름과 코드를 입력해주세요.');
-    let updated = newLocation.id ? locations.map(loc => loc.id === newLocation.id ? newLocation : loc) : [...locations, { ...newLocation, id: Date.now() }];
-    if (!newLocation.id) setExpandedLocs(prev => ({ ...prev, [updated[updated.length - 1].id]: true }));
-    saveLocations(updated);
+    const locId = newLocation.id || Date.now();
+    
+    // DB 저장용 페이로드
+    const dbPayload = {
+      id: locId,
+      code: newLocation.code,
+      name: newLocation.name,
+      level: newLocation.level,
+      base_text: newLocation.baseText
+    };
+
+    const { error } = await supabase.from('city_locations').upsert(dbPayload);
+    if (error) return alert('장소 DB 저장 실패: ' + error.message);
+
+    // 로컬 상태 업데이트
+    const updatedLoc = { ...newLocation, id: locId };
+    if (!newLocation.id) {
+      updatedLoc.services = [];
+      updatedLoc.activities = [];
+    }
+    
+    const updated = newLocation.id ? locations.map(loc => loc.id === locId ? updatedLoc : loc) : [...locations, updatedLoc];
+    if (!newLocation.id) setExpandedLocs(prev => ({ ...prev, [locId]: true }));
+    setLocations(updated);
     setIsLocModalOpen(false);
   };
 
@@ -82,6 +118,7 @@ export default function CityPage() {
     return supabase.storage.from('agemonia_images').getPublicUrl(fileName).data.publicUrl;
   };
 
+  // [수정됨] 서비스/활동 테이블에 개별 저장
   const handleSaveAction = async () => {
     if (!actionData.name.trim()) return alert('이름을 입력해주세요.');
     setIsUploading(true);
@@ -103,18 +140,37 @@ export default function CityPage() {
       finalOptions.push({ costs: opt.costs.filter(c => c.type && c.value), rewards: finalRewards });
     }
 
-    const savedAction = { id: actionData.id || Date.now(), name: actionData.name, baseText: actionData.baseText, options: finalOptions };
+    const actionId = actionData.id || Date.now();
+    
+    // DB 저장용 페이로드
+    const dbPayload = {
+      id: actionId,
+      location_id: targetLocId,
+      name: actionData.name,
+      base_text: actionData.baseText,
+      options: finalOptions
+    };
 
+    const tableName = actionType === 'service' ? 'city_services' : 'city_activities';
+    const { error } = await supabase.from(tableName).upsert(dbPayload);
+    
+    if (error) {
+      setIsUploading(false);
+      return alert('DB 저장 실패: ' + error.message);
+    }
+
+    // 로컬 상태 업데이트
+    const savedAction = { id: actionId, name: actionData.name, baseText: actionData.baseText, options: finalOptions };
     const updatedLocations = locations.map(loc => {
       if (loc.id === targetLocId) {
         const listName = actionType === 'service' ? 'services' : 'activities';
-        let updatedList = actionData.id ? loc[listName].map(item => item.id === actionData.id ? savedAction : item) : [...loc[listName], savedAction];
+        let updatedList = actionData.id ? loc[listName].map(item => item.id === actionId ? savedAction : item) : [...loc[listName], savedAction];
         return { ...loc, [listName]: updatedList };
       }
       return loc;
     });
 
-    await saveLocations(updatedLocations);
+    setLocations(updatedLocations);
     setIsUploading(false);
     closeActionModal();
   };
@@ -273,17 +329,11 @@ export default function CityPage() {
                         <img 
                           src="/ui/location.png" 
                           alt="location bg" 
-                          // 글자 크기의 1.8배 너비/높이로 자동 조절
                           className="w-[3em] h-[3em] object-contain drop-shadow-sm"
                         />
                         <span 
-                          // 위치를 absolute로 잡아 배경 이미지의 정중앙에 고정
                           className="absolute z-10 text-white font-extrabold font-serif"
-                          // 글자 크기를 부모보다 약간 작게 조절하고, 그림자를 주어 가독성 확보
-                          style={{ 
-                            fontSize: '0.85em', 
-                            textShadow: '0px 1px 3px rgba(0,0,0,0.9), 0px 0px 2px rgba(0,0,0,0.8)' 
-                          }}
+                          style={{ fontSize: '0.85em', textShadow: '0px 1px 3px rgba(0,0,0,0.9), 0px 0px 2px rgba(0,0,0,0.8)' }}
                         >
                           {loc.code}
                         </span>
