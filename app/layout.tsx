@@ -18,6 +18,7 @@ export default function RootLayout({ children }: any) {
               {children}
             </div>
 
+            {/* 하단 네비게이션 바에 일정(schedule) 링크 추가 */}
             <nav className="fixed bottom-0 w-full max-w-md mx-auto bg-[#3e2723] border-t-4 border-[#5d4037] flex justify-around items-center p-2 z-[90] shadow-[0_-4px_6px_rgba(0,0,0,0.5)]">
               <Link href="/" className="flex flex-col items-center text-[#d4b886] hover:text-white transition-colors">
                 <span className="text-2xl drop-shadow-md">⛺</span>
@@ -30,6 +31,11 @@ export default function RootLayout({ children }: any) {
               <Link href="/city" className="flex flex-col items-center text-[#d4b886] hover:text-white transition-colors">
                 <span className="text-2xl drop-shadow-md">🏰</span>
                 <span className="text-xs font-bold mt-1 tracking-wider">도시</span>
+              </Link>
+              {/* 새로 추가된 일정 탭 */}
+              <Link href="/schedule" className="flex flex-col items-center text-[#d4b886] hover:text-white transition-colors">
+                <span className="text-2xl drop-shadow-md">📅</span>
+                <span className="text-xs font-bold mt-1 tracking-wider">일정</span>
               </Link>
             </nav>
           </div>
