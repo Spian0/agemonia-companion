@@ -5,6 +5,8 @@ import { supabase } from '../supabaseClient';
 import { useRouter } from 'next/navigation';
 import IconText from '../components/IconText'; // 🚨 컴포넌트 불러오기
 
+import ImageCropperModal from '../components/ImageCropperModal';
+
 export default function HeroPage() {
   const router = useRouter();
   const [heroes, setHeroes] = useState([]);
@@ -16,6 +18,8 @@ export default function HeroPage() {
   const [editHero, setEditHero] = useState({ 
     id: null, name: '', player: '', hero_class: '', job: '', profile_url: null, previewUrl: null, file: null 
   });
+
+  const [cropper, setCropper] = useState({ isOpen: false, src: null });
 
   useEffect(() => {
     fetchHeroes();
@@ -89,9 +93,13 @@ export default function HeroPage() {
     fetchHeroes();
   };
 
+  // 👈 3. 기존 함수 덮어쓰기
   const handleImageChange = (e) => {
     const file = e.target.files[0];
-    if (file) setEditHero({ ...editHero, file: file, previewUrl: URL.createObjectURL(file) });
+    if (file) {
+      setCropper({ isOpen: true, src: URL.createObjectURL(file) });
+      e.target.value = ''; 
+    }
   };
 
   if (isLoading) return <div className="min-h-screen bg-[#dccba6] p-6 text-center font-serif font-bold text-[#3e2723]">영웅 정보를 불러오는 중입니다...</div>;
@@ -217,6 +225,18 @@ export default function HeroPage() {
           </div>
         </div>
       )}
+
+      <ImageCropperModal
+        isOpen={cropper.isOpen}
+        imageSrc={cropper.src}
+        cropShape="round" // 원형 가이드 적용
+        initialAspect={1} // 1:1 고정
+        onClose={() => setCropper({ ...cropper, isOpen: false })}
+        onCropComplete={(file, url) => {
+          setEditHero({ ...editHero, file: file, previewUrl: url });
+          setCropper({ ...cropper, isOpen: false });
+        }}
+      />
     </div>
   );
 }

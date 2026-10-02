@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import IconText from '../components/IconText'; 
 
+import ImageCropperModal from '../components/ImageCropperModal';
+
 export default function CityPage() {
   const [activeTab, setActiveTab] = useState('locations');
   const [locations, setLocations] = useState([]);
@@ -29,6 +31,8 @@ export default function CityPage() {
   });
   const [isUploading, setIsUploading] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState(null);
+
+  const [cropper, setCropper] = useState({ isOpen: false, src: null, oIdx: null, rIdx: null });
 
   useEffect(() => {
     async function fetchData() {
@@ -213,13 +217,17 @@ export default function CityPage() {
     newOpts[oIdx].rewards.push({ type: 'text', text: '', itemType: 'token', name: '', attr: '', imageFile: null, imageUrl: null, imagePreview: null });
     setActionData({ ...actionData, options: newOpts });
   };
+  // 기존 handleRewardImageChange 함수 수정
   const handleRewardImageChange = (oIdx, rIdx, e) => {
     const file = e.target.files[0];
     if (file) {
-      const newOpts = [...actionData.options];
-      newOpts[oIdx].rewards[rIdx].imageFile = file;
-      newOpts[oIdx].rewards[rIdx].imagePreview = URL.createObjectURL(file);
-      setActionData({ ...actionData, options: newOpts });
+      setCropper({ 
+        isOpen: true, 
+        src: URL.createObjectURL(file), 
+        oIdx, 
+        rIdx 
+      });
+      e.target.value = ''; // 동일한 파일 다시 선택 가능하도록 리셋
     }
   };
 
@@ -648,6 +656,21 @@ export default function CityPage() {
           </div>
         </div>
       )}
+
+      <ImageCropperModal
+        isOpen={cropper.isOpen}
+        imageSrc={cropper.src}
+        cropShape="rect" 
+        initialAspect={1} 
+        onClose={() => setCropper({ ...cropper, isOpen: false })}
+        onCropComplete={(file, url) => {
+          const newOpts = [...actionData.options];
+          newOpts[cropper.oIdx].rewards[cropper.rIdx].imageFile = file;
+          newOpts[cropper.oIdx].rewards[cropper.rIdx].imagePreview = url;
+          setActionData({ ...actionData, options: newOpts });
+          setCropper({ ...cropper, isOpen: false });
+        }}
+      />
     </div>
   );
 }

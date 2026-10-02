@@ -5,6 +5,8 @@ import { supabase } from '../../supabaseClient';
 import { useParams, useRouter } from 'next/navigation';
 import IconText from '../../components/IconText'; // 🚨 상위 폴더 경로 주의
 
+import ImageCropperModal from '../../components/ImageCropperModal';
+
 export default function HeroDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -21,6 +23,8 @@ export default function HeroDetailPage() {
   const [editHero, setEditHero] = useState({ 
     id: null, name: '', player: '', hero_class: '', job: '', profile_url: null, previewUrl: null, file: null 
   });
+
+  const [cropper, setCropper] = useState({ isOpen: false, src: null });
 
   useEffect(() => {
     const fetchHero = async () => {
@@ -46,9 +50,13 @@ export default function HeroDetailPage() {
     setIsEditModalOpen(true);
   };
 
+  // 기존 handleImageChange 수정
   const handleImageChange = (e) => {
     const file = e.target.files[0];
-    if (file) setEditHero({ ...editHero, file: file, previewUrl: URL.createObjectURL(file) });
+    if (file) {
+      setCropper({ isOpen: true, src: URL.createObjectURL(file) });
+      e.target.value = ''; // 같은 파일을 연달아 선택할 수 있게 초기화
+    }
   };
 
   const uploadProfileImage = async (file) => {
@@ -261,6 +269,19 @@ export default function HeroDetailPage() {
           </div>
         </div>
       )}
+
+      <ImageCropperModal
+        isOpen={cropper.isOpen}
+        imageSrc={cropper.src}
+        cropShape="round" // 중요: 영웅 프로필은 원형으로 가이드라인 표시
+        initialAspect={1} // 중요: 가로세로 1:1 비율 고정
+        onClose={() => setCropper({ ...cropper, isOpen: false })}
+        onCropComplete={(file, url) => {
+          // 크롭이 완료(자르기 버튼 클릭)되면 editHero 상태에 저장
+          setEditHero({ ...editHero, file: file, previewUrl: url });
+          setCropper({ ...cropper, isOpen: false });
+        }}
+      />
     </div>
   );
 }
